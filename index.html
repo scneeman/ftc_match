@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FTC Alliance Score Comparison</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f5f5f5;
+        padding: 20px;
+        text-align: center;
+    }
+    h1 {
+        font-size: 32px;
+        margin-bottom: 20px;
+    }
+    .container {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    .panel {
+        padding: 15px;
+        border-radius: 8px;
+        width: 200px;
+    }
+    .red { background: #ffcccc; }
+    .blue { background: #ccccff; }
+    label { font-size: 16px; display: block; margin-top: 10px; }
+    input {
+        width: 80%;
+        padding: 6px;
+        font-size: 16px;
+        margin-top: 5px;
+    }
+    button {
+        margin-top: 20px;
+        padding: 12px 20px;
+        font-size: 18px;
+        cursor: pointer;
+    }
+    table {
+        margin: 20px auto;
+        border-collapse: collapse;
+        width: 80%;
+    }
+    th, td {
+        padding: 12px;
+        border: 1px solid #ccc;
+        font-size: 18px;
+    }
+</style>
+</head>
+<body>
+
+<h1>FTC Alliance Score Comparison</h1>
+
+<div class="container">
+    <div class="panel red">
+        <h2>Red Alliance</h2>
+        <label>Team 1:</label>
+        <input id="red1" type="text">
+        <label>Team 2:</label>
+        <input id="red2" type="text">
+    </div>
+
+    <div class="panel blue">
+        <h2>Blue Alliance</h2>
+        <label>Team 1:</label>
+        <input id="blue1" type="text">
+        <label>Team 2:</label>
+        <input id="blue2" type="text">
+    </div>
+</div>
+
+<button onclick="fetchStats()">Compare Alliances</button>
+
+<div id="results"></div>
+
+<script>
+const URL = "https://api.ftcscout.org/rest/v1/teams/";
+const SEASON = "2025";
+
+// ---------------- FETCHING LOGIC ---------------- //
+
+async function fetchTeamStats(teamNumber) {
+    try {
+        const response = await fetch(`${URL}${teamNumber}/quick-stats?season=${SEASON}`);
+        const data = await response.json();
+        if (!data.tot) return null;
+        return data;
+    } catch {
+        return null;
+    }
+}
+
+async function fetchAllianceStats(teamList) {
+    const total = { tot: 0, auto: 0, dc: 0, eg: 0 };
+
+    for (const team of teamList) {
+        const data = await fetchTeamStats(team);
+        if (!data) return null;
+
+        total.tot += data.tot.value;
+        total.auto += data.auto.value;
+        total.dc += data.dc.value;
+        total.eg += data.eg.value;
+    }
+
+    return total;
+}
+
+// ---------------- MAIN FETCH FUNCTION ---------------- //
+
+async function fetchStats() {
+    const red1 = document.getElementById("red1").value.trim();
+    const red2 = document.getElementById("red2").value.trim();
+    const blue1 = document.getElementById("blue1").value.trim();
+    const blue2 = document.getElementById("blue2").value.trim();
+
+    const teams = [red1, red2, blue1, blue2];
+
+    if (!teams.every(t => /^\d+$/.test(t))) {
+        alert("All team numbers must be numeric.");
+        return;
+    }
+
+    const redTeams = [Number(red1), Number(red2)];
+    const blueTeams = [Number(blue1), Number(blue2)];
+
+    const redStats = await fetchAllianceStats(redTeams);
+    const blueStats = await fetchAllianceStats(blueTeams);
+
+    if (!redStats || !blueStats) {
+        alert("One or more teams not found or missing data.");
+        return;
+    }
+
+    displayResults(redStats, blueStats);
+}
+
+// ---------------- DISPLAY LOGIC ---------------- //
+
+function displayResults(red, blue) {
+    const categories = [
+        ["Total Score", "tot", "#ffdddd", "#ddddff"],
+        ["Autonomous", "auto", "#ffeedb", "#ddeeff"],
+        ["TeleOp (DC)", "dc", "#fff7cc", "#e0f0ff"],
+        ["Endgame", "eg", "#ffe6cc", "#e6e6ff"]
+    ];
+
+    let html = `
+        <table>
+            <tr>
+                <th>Category</th>
+                <th style="color:red">Red Alliance</th>
+                <th style="color:blue">Blue Alliance</th>
+            </tr>
+    `;
+
+    for (const [title, key, redColor, blueColor] of categories) {
+        const redVal = red[key].toFixed(2);
+        const blueVal = blue[key].toFixed(2);
+
+        let redBg = redColor;
+        let blueBg = blueColor;
+
+        if (redVal > blueVal) redBg = "#ff9999";
+        else if (blueVal > redVal) blueBg = "#9999ff";
+        else redBg = blueBg = "#eeeeee";
+
+        html += `
+            <tr>
+                <td>${title}</td>
+                <td style="background:${redBg}">${redVal}</td>
+                <td style="background:${blueBg}">${blueVal}</td>
+            </tr>
+        `;
+    }
+
+    html += "</table>";
+
+    document.getElementById("results").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
