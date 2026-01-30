@@ -96,19 +96,30 @@ async function fetchTeamStats(teamNumber) {
 }
 
 async function fetchAllianceStats(teamList) {
-    const total = { tot: 0, auto: 0, dc: 0, eg: 0 };
+    const alliance = {
+        teams: [],
+        totals: { tot: 0, auto: 0, dc: 0, eg: 0 }
+    };
 
     for (const team of teamList) {
         const data = await fetchTeamStats(team);
         if (!data) return null;
 
-        total.tot += data.tot.value;
-        total.auto += data.auto.value;
-        total.dc += data.dc.value;
-        total.eg += data.eg.value;
+        alliance.teams.push({
+            team,
+            tot: data.tot.value,
+            auto: data.auto.value,
+            dc: data.dc.value,
+            eg: data.eg.value
+        });
+
+        alliance.totals.tot += data.tot.value;
+        alliance.totals.auto += data.auto.value;
+        alliance.totals.dc += data.dc.value;
+        alliance.totals.eg += data.eg.value;
     }
 
-    return total;
+    return alliance;
 }
 
 // ---------------- MAIN FETCH FUNCTION ---------------- //
@@ -126,11 +137,8 @@ async function fetchStats() {
         return;
     }
 
-    const redTeams = [Number(red1), Number(red2)];
-    const blueTeams = [Number(blue1), Number(blue2)];
-
-    const redStats = await fetchAllianceStats(redTeams);
-    const blueStats = await fetchAllianceStats(blueTeams);
+    const redStats = await fetchAllianceStats([Number(red1), Number(red2)]);
+    const blueStats = await fetchAllianceStats([Number(blue1), Number(blue2)]);
 
     if (!redStats || !blueStats) {
         alert("One or more teams not found or missing data.");
@@ -141,6 +149,11 @@ async function fetchStats() {
 }
 
 // ---------------- DISPLAY LOGIC ---------------- //
+
+function breakdown(values) {
+    const sum = values.reduce((a, b) => a + b, 0);
+    return `${values.map(v => v.toFixed(2)).join(" + ")} = ${sum.toFixed(2)}`;
+}
 
 function displayResults(red, blue) {
     const categories = [
@@ -160,21 +173,24 @@ function displayResults(red, blue) {
     `;
 
     for (const [title, key, redColor, blueColor] of categories) {
-        const redVal = red[key].toFixed(2);
-        const blueVal = blue[key].toFixed(2);
+        const redValues = red.teams.map(t => t[key]);
+        const blueValues = blue.teams.map(t => t[key]);
+
+        const redTotal = red.totals[key];
+        const blueTotal = blue.totals[key];
 
         let redBg = redColor;
         let blueBg = blueColor;
 
-        if (redVal > blueVal) redBg = "#ff9999";
-        else if (blueVal > redVal) blueBg = "#9999ff";
+        if (redTotal > blueTotal) redBg = "#ff9999";
+        else if (blueTotal > redTotal) blueBg = "#9999ff";
         else redBg = blueBg = "#eeeeee";
 
         html += `
             <tr>
                 <td>${title}</td>
-                <td style="background:${redBg}">${redVal}</td>
-                <td style="background:${blueBg}">${blueVal}</td>
+                <td style="background:${redBg}">${breakdown(redValues)}</td>
+                <td style="background:${blueBg}">${breakdown(blueValues)}</td>
             </tr>
         `;
     }
